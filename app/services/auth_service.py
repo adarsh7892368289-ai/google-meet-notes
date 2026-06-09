@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
@@ -20,7 +21,11 @@ async def create_user(session: AsyncSession, *, email: str, name: str, password:
 
     user = User(email=email, name=name, hashed_password=hash_password(password))
     session.add(user)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        raise EmailAlreadyExistsError(email)
     await session.refresh(user)
     return user
 
