@@ -1,13 +1,24 @@
 # app/services/connection_service.py
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crypto import decrypt, encrypt
 from app.google.oauth_client import OAuthClient, TokenBundle
 from app.models import OAuthConnection, User
+
+logger = logging.getLogger(__name__)
+
+
+class TokenRefreshError(Exception):
+    def __init__(self, message: str, *, permanent: bool) -> None:
+        super().__init__(message)
+        self.permanent = permanent
+
 
 # refresh a bit early to avoid using a token that expires mid-request
 _EXPIRY_SKEW = timedelta(seconds=60)
@@ -66,6 +77,9 @@ def _is_fresh(conn: OAuthConnection) -> bool:
 async def get_valid_access_token(
     session: AsyncSession, conn: OAuthConnection, oauth_client: OAuthClient
 ) -> str:
+    if conn.status == "needs_reconnect":
+        raise TokenRefreshError("connection needs reconnect", permanent=True)
+
     if _is_fresh(conn):
         return conn.access_token_cache  # type: ignore[return-value]
 
@@ -77,10 +91,17 @@ async def get_valid_access_token(
         refresh_token = decrypt(conn.refresh_token_encrypted)
         try:
             bundle = await oauth_client.refresh(refresh_token)
-        except Exception:
-            conn.status = "needs_reconnect"
-            await session.commit()
-            raise
+        except httpx.HTTPStatusError as exc:
+            if 400 <= exc.response.status_code < 500:
+                conn.status = "needs_reconnect"
+                await session.commit()
+                logger.warning("permanent token refresh failure for connection %s", conn.id)
+                raise TokenRefreshError("refresh rejected", permanent=True) from exc
+            logger.warning("transient token refresh failure for connection %s", conn.id)
+            raise TokenRefreshError("refresh failed", permanent=False) from exc
+        except httpx.RequestError as exc:
+            logger.warning("network error during token refresh for connection %s", conn.id)
+            raise TokenRefreshError("refresh failed", permanent=False) from exc
 
         conn.access_token_cache = bundle.access_token
         conn.access_token_expiry = _expiry_from(bundle.expires_in)
@@ -97,8 +118,8 @@ async def delete_connection(
 ) -> None:
     try:
         await oauth_client.revoke(decrypt(conn.refresh_token_encrypted))
-    except Exception:
-        pass  # best-effort revoke; still remove locally
+    except Exception as exc:  # best-effort revoke; never block local disconnect
+        logger.warning("failed to revoke token during disconnect of connection %s: %s", conn.id, exc)
     await session.delete(conn)
     await session.commit()
     _locks.pop(str(conn.id), None)
