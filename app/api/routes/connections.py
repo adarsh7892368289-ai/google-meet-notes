@@ -1,5 +1,6 @@
 import uuid
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,13 +39,25 @@ async def callback(
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown user")
 
-    bundle = await oauth_client.exchange_code(code)
+    try:
+        bundle = await oauth_client.exchange_code(code)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to exchange authorization code",
+        ) from exc
     if not bundle.refresh_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No refresh token returned; re-consent with prompt=consent required",
         )
-    email = await oauth_client.fetch_userinfo(bundle.access_token)
+    try:
+        email = await oauth_client.fetch_userinfo(bundle.access_token)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to fetch Google account info",
+        ) from exc
     await connection_service.upsert_connection(
         session, user=user, bundle=bundle, google_email=email
     )

@@ -1,3 +1,6 @@
+import uuid
+
+import httpx
 import pytest
 from cryptography.fernet import Fernet
 
@@ -106,3 +109,50 @@ async def test_delete_connection(client, fake_oauth):
         "/v1/connections/google", headers={"Authorization": f"Bearer {token}"}
     )
     assert status.json()["connected"] is False
+
+
+async def test_callback_returns_400_when_code_exchange_fails(client):
+    class ExchangeFailsClient:
+        async def exchange_code(self, code: str) -> TokenBundle:
+            raise httpx.HTTPStatusError(
+                "bad",
+                request=httpx.Request("POST", "https://x"),
+                response=httpx.Response(400, request=httpx.Request("POST", "https://x")),
+            )
+
+    app.dependency_overrides[get_oauth_client] = lambda: ExchangeFailsClient()
+    try:
+        token = await _register(client)
+        me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        state = create_oauth_state(me.json()["id"])
+        resp = await client.get(f"/v1/connections/google/callback?code=abc&state={state}")
+        assert resp.status_code == 400
+    finally:
+        app.dependency_overrides.pop(get_oauth_client, None)
+
+
+async def test_callback_returns_400_when_no_refresh_token(client):
+    class NoRefreshTokenClient:
+        async def exchange_code(self, code: str) -> TokenBundle:
+            return TokenBundle(
+                access_token="at", expires_in=3599, scope="openid email", refresh_token=None
+            )
+
+        async def fetch_userinfo(self, access_token: str) -> str:
+            return "person@acme.com"
+
+    app.dependency_overrides[get_oauth_client] = lambda: NoRefreshTokenClient()
+    try:
+        token = await _register(client)
+        me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        state = create_oauth_state(me.json()["id"])
+        resp = await client.get(f"/v1/connections/google/callback?code=abc&state={state}")
+        assert resp.status_code == 400
+    finally:
+        app.dependency_overrides.pop(get_oauth_client, None)
+
+
+async def test_callback_returns_400_for_unknown_user(client, fake_oauth):
+    state = create_oauth_state(str(uuid.uuid4()))
+    resp = await client.get(f"/v1/connections/google/callback?code=abc&state={state}")
+    assert resp.status_code == 400
