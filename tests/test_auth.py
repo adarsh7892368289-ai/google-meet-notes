@@ -52,3 +52,11 @@ async def test_me_requires_auth_and_returns_user(client):
 
     unauth = await client.get("/v1/auth/me")
     assert unauth.status_code in (401, 403)
+
+
+async def test_me_with_malformed_token_returns_401(client):
+    from app.security import create_access_token
+
+    bad_token = create_access_token(subject="not-a-uuid")
+    resp = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {bad_token}"})
+    assert resp.status_code == 401

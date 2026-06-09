@@ -23,11 +23,11 @@ async def get_current_user(
     )
     try:
         payload = decode_access_token(credentials.credentials)
-        user_id = payload["sub"]
-    except (jwt.PyJWTError, KeyError):
+        user_uuid = uuid.UUID(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError):
         raise creds_exc
 
-    user = await session.get(User, uuid.UUID(user_id))
+    user = await session.get(User, user_uuid)
     if user is None:
         raise creds_exc
     return user
