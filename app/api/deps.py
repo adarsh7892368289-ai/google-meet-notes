@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
+from app.google.calendar_client import CalendarClient, GoogleCalendarClient
+from app.google.meet_client import GoogleMeetClient, MeetClient
 from app.google.oauth_client import GoogleOAuthClient, OAuthClient
 from app.models import User
 from app.security import decode_access_token
@@ -45,3 +47,11 @@ def get_oauth_client() -> OAuthClient:
         redirect_uri=settings.google_redirect_uri,
         scopes=settings.google_scopes,
     )
+
+
+def get_calendar_client() -> CalendarClient:
+    return GoogleCalendarClient()
+
+
+def get_meet_client() -> MeetClient:
+    return GoogleMeetClient()
