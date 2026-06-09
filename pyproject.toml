@@ -12,7 +12,7 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "pyjwt>=2.10",
-    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.1",
     "python-multipart>=0.0.12",
 ]
 
