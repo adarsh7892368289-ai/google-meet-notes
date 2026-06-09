@@ -12,3 +12,18 @@ def test_settings_reads_values_from_env(monkeypatch):
     assert settings.jwt_secret == "test-secret"
     assert settings.jwt_expire_minutes == 60
     assert settings.database_url.endswith("/db")
+
+
+def test_settings_reads_google_oauth_values(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "cid")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "secret")
+    monkeypatch.setenv("GOOGLE_REDIRECT_URI", "https://app.example.com/cb")
+    monkeypatch.setenv("ENCRYPTION_KEY", "k" * 44)
+
+    settings = Settings()
+
+    assert settings.google_client_id == "cid"
+    assert settings.google_client_secret == "secret"
+    assert settings.google_redirect_uri == "https://app.example.com/cb"
+    assert settings.encryption_key == "k" * 44
+    assert "openid" in settings.google_scopes
