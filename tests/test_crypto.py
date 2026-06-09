@@ -1,5 +1,5 @@
 import pytest
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 
 from app.crypto import decrypt, encrypt
 
@@ -27,5 +27,5 @@ def test_decrypt_rejects_tampered_token():
     # would not be a real tamper.)
     mid = len(token) // 2
     tampered = token[:mid] + bytes([token[mid] ^ 0x01]) + token[mid + 1 :]
-    with pytest.raises(Exception):
+    with pytest.raises(InvalidToken):
         decrypt(tampered)

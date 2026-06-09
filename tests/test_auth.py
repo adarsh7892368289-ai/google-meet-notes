@@ -60,3 +60,21 @@ async def test_me_with_malformed_token_returns_401(client):
     bad_token = create_access_token(subject="not-a-uuid")
     resp = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {bad_token}"})
     assert resp.status_code == 401
+
+
+async def test_oauth_state_token_not_accepted_as_bearer(client):
+    from app.security import create_oauth_state
+
+    reg = await client.post(
+        "/v1/auth/register",
+        json={"email": "state@acme.com", "name": "S", "password": "password123"},
+    )
+    token = reg.json()["access_token"]
+    me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    user_id = me.json()["id"]
+
+    state_token = create_oauth_state(user_id)
+    resp = await client.get(
+        "/v1/auth/me", headers={"Authorization": f"Bearer {state_token}"}
+    )
+    assert resp.status_code == 401

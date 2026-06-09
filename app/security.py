@@ -6,6 +6,7 @@ import jwt
 from app.config import get_settings
 
 _ALGORITHM = "HS256"
+_ACCESS_PURPOSE = "access"
 
 
 def hash_password(plain: str) -> str:
@@ -21,7 +22,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 def create_access_token(subject: str) -> str:
     settings = get_settings()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_expire_minutes)
-    payload = {"sub": subject, "exp": expire}
+    payload = {"sub": subject, "purpose": _ACCESS_PURPOSE, "exp": expire}
     return jwt.encode(payload, settings.jwt_secret, algorithm=_ALGORITHM)
 
 
