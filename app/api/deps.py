@@ -5,7 +5,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.db import get_session
+from app.google.oauth_client import GoogleOAuthClient, OAuthClient
 from app.models import User
 from app.security import decode_access_token
 
@@ -33,3 +35,13 @@ async def get_current_user(
     if user is None:
         raise creds_exc
     return user
+
+
+def get_oauth_client() -> OAuthClient:
+    settings = get_settings()
+    return GoogleOAuthClient(
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret,
+        redirect_uri=settings.google_redirect_uri,
+        scopes=settings.google_scopes,
+    )
