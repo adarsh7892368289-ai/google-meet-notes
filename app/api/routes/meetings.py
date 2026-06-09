@@ -1,5 +1,6 @@
 import uuid
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,10 +45,20 @@ async def create_meeting(
             status_code=status.HTTP_409_CONFLICT,
             detail="No Google account connected. Connect one first.",
         )
-    except TokenRefreshError:
+    except TokenRefreshError as exc:
+        if getattr(exc, "permanent", True):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Google connection needs to be reconnected.",
+            )
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Google connection needs to be reconnected.",
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Temporary problem reaching Google. Please retry.",
+        )
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to create the meeting in Google Calendar.",
         )
     response = MeetingResponse.model_validate(meeting)
     response.warning = warning

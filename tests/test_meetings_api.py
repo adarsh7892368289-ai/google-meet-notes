@@ -1,3 +1,4 @@
+import httpx
 import pytest
 from cryptography.fernet import Fernet
 
@@ -116,6 +117,50 @@ async def test_create_meeting_validates_times(client, fakes):
     bad["end_time"] = "2026-06-12T09:00:00+00:00"  # before start
     resp = await client.post("/v1/meetings", json=bad, headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 422
+
+
+async def test_get_and_delete_other_users_meeting_404(client, fakes):
+    token_a = await _register_and_connect(client)
+    created = await client.post(
+        "/v1/meetings", json=_body(), headers={"Authorization": f"Bearer {token_a}"}
+    )
+    a_id = created.json()["id"]
+
+    reg_b = await client.post(
+        "/v1/auth/register",
+        json={"email": "userb@acme.com", "name": "B", "password": "password123"},
+    )
+    token_b = reg_b.json()["access_token"]
+
+    got = await client.get(
+        f"/v1/meetings/{a_id}", headers={"Authorization": f"Bearer {token_b}"}
+    )
+    assert got.status_code == 404
+    deleted = await client.delete(
+        f"/v1/meetings/{a_id}", headers={"Authorization": f"Bearer {token_b}"}
+    )
+    assert deleted.status_code == 404
+
+
+class FailingCalendarClient:
+    async def create_event(self, access_token, *, summary, description, start, end, attendees):
+        raise httpx.HTTPStatusError(
+            "boom",
+            request=httpx.Request("POST", "https://x"),
+            response=httpx.Response(500, request=httpx.Request("POST", "https://x")),
+        )
+
+    async def delete_event(self, access_token, event_id):
+        pass
+
+
+async def test_create_meeting_calendar_failure_returns_502(client, fakes):
+    token = await _register_and_connect(client)
+    app.dependency_overrides[get_calendar_client] = lambda: FailingCalendarClient()
+    resp = await client.post(
+        "/v1/meetings", json=_body(), headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 502
 
 
 async def test_list_get_delete_meeting(client, fakes):

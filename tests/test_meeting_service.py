@@ -145,6 +145,42 @@ async def test_list_and_get_meetings(db_session):
     assert fetched.id == meetings[0].id
 
 
+class NoLinkCalendarClient:
+    async def create_event(self, access_token, *, summary, description, start, end, attendees):
+        return CreatedEvent(
+            event_id="evt-1", meet_uri=None, meeting_code=None, conference_status="pending"
+        )
+
+    async def delete_event(self, access_token, event_id):
+        pass
+
+
+async def test_create_meeting_without_meet_link_downgrades(db_session):
+    user = await _user_with_connection(db_session)
+    meeting, warning = await meeting_service.create_meeting(
+        db_session, user=user, payload=_payload(notes_enabled=True),
+        oauth_client=FakeOAuthClient(), calendar_client=NoLinkCalendarClient(),
+        meet_client=FakeMeetClient(),
+    )
+    assert meeting.notes_enabled is False
+    assert warning is not None
+
+
+async def test_get_meeting_other_user_returns_none(db_session):
+    user_a = await _user_with_connection(db_session)
+    user_b = User(email="other@acme.com", name="B", hashed_password="x")
+    db_session.add(user_b)
+    await db_session.commit()
+    await db_session.refresh(user_b)
+
+    meeting, _ = await meeting_service.create_meeting(
+        db_session, user=user_a, payload=_payload(),
+        oauth_client=FakeOAuthClient(), calendar_client=FakeCalendarClient(),
+        meet_client=FakeMeetClient(),
+    )
+    assert await meeting_service.get_meeting(db_session, user_b, meeting.id) is None
+
+
 async def test_delete_meeting_removes_and_deletes_event(db_session):
     user = await _user_with_connection(db_session)
     cal = FakeCalendarClient()

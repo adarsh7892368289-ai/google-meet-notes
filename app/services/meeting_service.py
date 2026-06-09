@@ -1,6 +1,7 @@
 import logging
 import uuid
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,11 +53,12 @@ async def create_meeting(
             try:
                 space_name = await meet_client.get_space_name(access_token, created.meeting_code)
                 await meet_client.enable_auto_transcript(access_token, space_name)
-            except Exception:
+            except httpx.HTTPError:
                 logger.warning(
                     "could not enable auto-transcript for meeting code %s (user %s)",
                     created.meeting_code,
                     user.id,
+                    exc_info=True,
                 )
                 notes_enabled = False
                 warning = (
@@ -121,7 +123,9 @@ async def delete_meeting(
                 )
                 await calendar_client.delete_event(access_token, meeting.calendar_event_id)
         except Exception:
-            logger.warning("failed to delete calendar event for meeting %s", meeting_id)
+            logger.warning(
+                "failed to delete calendar event for meeting %s", meeting_id, exc_info=True
+            )
     await session.delete(meeting)
     await session.commit()
     return True
