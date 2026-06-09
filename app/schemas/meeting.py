@@ -21,6 +21,8 @@ class MeetingCreate(BaseModel):
 
     @model_validator(mode="after")
     def _check_times(self) -> "MeetingCreate":
+        if self.start_time.tzinfo is None or self.end_time.tzinfo is None:
+            raise ValueError("start_time and end_time must be timezone-aware")
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time")
         return self

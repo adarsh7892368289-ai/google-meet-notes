@@ -63,6 +63,36 @@ async def test_create_event_handles_missing_conference():
     assert result.meeting_code is None
 
 
+async def test_create_event_strips_query_params_from_meeting_code():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "id": "evt-q",
+                "conferenceData": {
+                    "status": {"statusCode": "success"},
+                    "entryPoints": [
+                        {
+                            "entryPointType": "video",
+                            "uri": "https://meet.google.com/abc-defg-hij?authuser=0",
+                        },
+                    ],
+                },
+            },
+        )
+
+    result = await _client(handler).create_event(
+        "at-1",
+        summary="S",
+        description=None,
+        start=datetime(2026, 6, 12, 10, 0, tzinfo=timezone.utc),
+        end=datetime(2026, 6, 12, 11, 0, tzinfo=timezone.utc),
+        attendees=[],
+    )
+    assert result.meet_uri == "https://meet.google.com/abc-defg-hij?authuser=0"
+    assert result.meeting_code == "abc-defg-hij"
+
+
 async def test_delete_event_calls_delete():
     seen = {}
 

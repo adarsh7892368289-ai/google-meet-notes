@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -90,7 +91,10 @@ def _parse_event(data: dict) -> CreatedEvent:
         if ep.get("entryPointType") == "video":
             meet_uri = ep.get("uri")
             break
-    meeting_code = meet_uri.rstrip("/").split("/")[-1] if meet_uri else None
+    meeting_code = None
+    if meet_uri:
+        path = urlsplit(meet_uri).path.rstrip("/")
+        meeting_code = path.split("/")[-1] or None
     return CreatedEvent(
         event_id=data["id"],
         meet_uri=meet_uri,
