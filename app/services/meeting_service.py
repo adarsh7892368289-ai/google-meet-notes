@@ -45,6 +45,7 @@ async def create_meeting(
 
     notes_enabled = payload.notes_enabled
     warning: str | None = None
+    space_name: str | None = None
     if notes_enabled:
         if not created.meeting_code:
             notes_enabled = False
@@ -61,6 +62,7 @@ async def create_meeting(
                     exc_info=True,
                 )
                 notes_enabled = False
+                space_name = None
                 warning = (
                     "Meeting created, but automatic notes could not be enabled. "
                     "This usually means the Google account's plan does not support "
@@ -77,6 +79,7 @@ async def create_meeting(
         calendar_event_id=created.event_id,
         meet_join_uri=created.meet_uri,
         meeting_code=created.meeting_code,
+        meet_space_name=space_name,
         notes_enabled=notes_enabled,
         notes_config=payload.notes_config.model_dump(),
         status="scheduled",
