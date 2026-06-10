@@ -22,6 +22,7 @@ class OAuthConnection(Base):
         index=True,
     )
     google_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    google_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     refresh_token_encrypted: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     access_token_cache: Mapped[str | None] = mapped_column(String(4096), nullable=True)
     access_token_expiry: Mapped[datetime | None] = mapped_column(

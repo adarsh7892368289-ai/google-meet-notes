@@ -181,3 +181,13 @@ async def test_upsert_preserves_refresh_token_when_bundle_has_none(db_session):
     assert conn.refresh_token_encrypted == original_encrypted
     assert decrypt(conn.refresh_token_encrypted) == "rt-original"
     assert conn.access_token_cache == "at-2"
+
+
+async def test_oauth_connection_stores_google_user_id(db_session):
+    user = await _make_user(db_session)
+    bundle = TokenBundle(access_token="at", expires_in=3599, scope="openid", refresh_token="rt")
+    conn = await connection_service.upsert_connection(
+        db_session, user=user, bundle=bundle, google_email="user@acme.com",
+        google_user_id="108200000000000000001",
+    )
+    assert conn.google_user_id == "108200000000000000001"
