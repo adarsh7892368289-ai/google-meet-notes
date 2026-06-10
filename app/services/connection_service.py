@@ -49,6 +49,7 @@ async def upsert_connection(
     user: User,
     bundle: TokenBundle,
     google_email: str,
+    google_user_id: str | None = None,
 ) -> OAuthConnection:
     conn = await get_connection(session, user)
     if conn is None:
@@ -56,6 +57,8 @@ async def upsert_connection(
         session.add(conn)
 
     conn.google_email = google_email
+    if google_user_id is not None:
+        conn.google_user_id = google_user_id
     if bundle.refresh_token:
         conn.refresh_token_encrypted = encrypt(bundle.refresh_token)
     conn.access_token_cache = bundle.access_token
