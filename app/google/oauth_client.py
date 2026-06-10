@@ -21,11 +21,17 @@ class TokenBundle:
     refresh_token: str | None = None
 
 
+@dataclass
+class UserInfo:
+    email: str
+    sub: str
+
+
 class OAuthClient(Protocol):
     def build_authorization_url(self, state: str) -> str: ...
     async def exchange_code(self, code: str) -> TokenBundle: ...
     async def refresh(self, refresh_token: str) -> TokenBundle: ...
-    async def fetch_userinfo(self, access_token: str) -> str: ...
+    async def fetch_userinfo(self, access_token: str) -> UserInfo: ...
     async def revoke(self, token: str) -> None: ...
 
 
@@ -95,13 +101,14 @@ class GoogleOAuthClient:
             resp.raise_for_status()
             return self._to_bundle(resp.json())
 
-    async def fetch_userinfo(self, access_token: str) -> str:
+    async def fetch_userinfo(self, access_token: str) -> UserInfo:
         async with self._http() as http:
             resp = await http.get(
                 USERINFO_URI, headers={"Authorization": f"Bearer {access_token}"}
             )
             resp.raise_for_status()
-            return resp.json()["email"]
+            data = resp.json()
+            return UserInfo(email=data["email"], sub=data["sub"])
 
     async def revoke(self, token: str) -> None:
         async with self._http() as http:

@@ -65,11 +65,12 @@ async def test_refresh_returns_token_bundle():
     assert bundle.refresh_token is None
 
 
-async def test_fetch_userinfo_returns_email():
+async def test_fetch_userinfo_returns_email_and_sub():
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.headers["Authorization"] == "Bearer at-1"
-        return httpx.Response(200, json={"email": "user@acme.com"})
+        return httpx.Response(200, json={"email": "user@acme.com", "sub": "10820000000001"})
 
     client = _client_with_handler(handler)
-    email = await client.fetch_userinfo("at-1")
-    assert email == "user@acme.com"
+    info = await client.fetch_userinfo("at-1")
+    assert info.email == "user@acme.com"
+    assert info.sub == "10820000000001"
