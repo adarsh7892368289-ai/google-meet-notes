@@ -25,6 +25,10 @@ class Settings(BaseSettings):
         "https://www.googleapis.com/auth/gmail.send"
     )
     encryption_key: str = ""
+    workspace_events_topic: str = ""
+    push_audience: str = ""
+    push_service_account_email: str = ""
+    subscription_ttl_seconds: int = 604800
 
 
 @lru_cache

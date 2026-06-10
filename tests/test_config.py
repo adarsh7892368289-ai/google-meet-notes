@@ -27,3 +27,18 @@ def test_settings_reads_google_oauth_values(monkeypatch):
     assert settings.google_redirect_uri == "https://app.example.com/cb"
     assert settings.encryption_key == "k" * 44
     assert "openid" in settings.google_scopes
+
+
+def test_events_settings_have_defaults(monkeypatch):
+    monkeypatch.delenv("WORKSPACE_EVENTS_TOPIC", raising=False)
+    monkeypatch.delenv("PUSH_AUDIENCE", raising=False)
+    monkeypatch.delenv("PUSH_SERVICE_ACCOUNT_EMAIL", raising=False)
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    s = get_settings()
+    assert s.workspace_events_topic == ""
+    assert s.push_audience == ""
+    assert s.push_service_account_email == ""
+    assert s.subscription_ttl_seconds == 604800
+    get_settings.cache_clear()
