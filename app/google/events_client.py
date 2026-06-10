@@ -85,5 +85,5 @@ class GoogleEventsClient:
     ) -> None:
         async with self._http(access_token) as http:
             resp = await http.delete(f"{EVENTS_BASE}/{subscription_name}")
-            if resp.status_code not in (200, 204, 404):
+            if resp.status_code not in (200, 204, 404, 410):
                 resp.raise_for_status()

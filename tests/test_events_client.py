@@ -45,7 +45,7 @@ async def test_create_subscription_posts_user_target_and_event_types():
     assert result.state == "ACTIVE"
 
 
-async def test_create_subscription_unwraps_operation_without_response_block():
+async def test_create_subscription_unwraps_operation_response():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
