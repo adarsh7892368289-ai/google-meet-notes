@@ -195,3 +195,13 @@ async def test_delete_meeting_removes_and_deletes_event(db_session):
     assert ok is True
     assert "evt-1" in cal.deleted
     assert await meeting_service.get_meeting(db_session, user, meeting.id) is None
+
+
+async def test_create_meeting_persists_meet_space_name(db_session):
+    user = await _user_with_connection(db_session)
+    meeting, _ = await meeting_service.create_meeting(
+        db_session, user=user, payload=_payload(notes_enabled=True),
+        oauth_client=FakeOAuthClient(), calendar_client=FakeCalendarClient(),
+        meet_client=FakeMeetClient(),
+    )
+    assert meeting.meet_space_name == "spaces/SERVERID"

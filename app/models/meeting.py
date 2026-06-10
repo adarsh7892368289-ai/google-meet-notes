@@ -28,6 +28,7 @@ class Meeting(Base):
     calendar_event_id: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     meet_join_uri: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     meeting_code: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    meet_space_name: Mapped[str | None] = mapped_column(String(256), nullable=True, index=True)
     notes_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     notes_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="scheduled")
