@@ -29,11 +29,29 @@ class FakeOAuthClient:
     async def refresh(self, refresh_token: str) -> TokenBundle:
         return TokenBundle(access_token="at2", expires_in=3599, scope="openid email")
 
-    async def fetch_userinfo(self, access_token: str) -> str:
-        return "person@acme.com"
+    async def fetch_userinfo(self, access_token: str):
+        from app.google.oauth_client import UserInfo
+        return UserInfo(email="person@acme.com", sub="108200001")
 
     async def revoke(self, token: str) -> None:
         return None
+
+
+class FakeEventsClient:
+    def __init__(self):
+        self.created = []
+
+    async def create_subscription(self, access_token, *, google_user_id, topic, ttl_seconds):
+        from app.google.events_client import SubscriptionResult
+        self.created.append(google_user_id)
+        return SubscriptionResult("subscriptions/sub-1", "2026-06-20T00:00:00Z", "ACTIVE")
+
+    async def renew_subscription(self, access_token, *, subscription_name, ttl_seconds):
+        from app.google.events_client import SubscriptionResult
+        return SubscriptionResult(subscription_name, "2026-06-27T00:00:00Z", "ACTIVE")
+
+    async def delete_subscription(self, access_token, *, subscription_name):
+        pass
 
 
 @pytest.fixture
@@ -42,6 +60,19 @@ def fake_oauth():
     app.dependency_overrides[get_oauth_client] = lambda: fake
     yield fake
     app.dependency_overrides.pop(get_oauth_client, None)
+
+
+@pytest.fixture
+def fake_events(monkeypatch):
+    from app.api.deps import get_events_client
+    fake = FakeEventsClient()
+    app.dependency_overrides[get_events_client] = lambda: fake
+    monkeypatch.setenv("WORKSPACE_EVENTS_TOPIC", "projects/p/topics/meet-events")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    yield fake
+    app.dependency_overrides.pop(get_events_client, None)
+    get_settings.cache_clear()
 
 
 async def _register(client) -> str:
@@ -61,9 +92,8 @@ async def test_start_returns_authorization_url(client, fake_oauth):
     assert resp.json()["authorization_url"].startswith("https://auth.example/consent?state=")
 
 
-async def test_callback_creates_connection(client, fake_oauth):
+async def test_callback_creates_connection(client, fake_oauth, fake_events):
     token = await _register(client)
-    # find the user id from /me
     me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     user_id = me.json()["id"]
     state = create_oauth_state(user_id)
@@ -78,6 +108,7 @@ async def test_callback_creates_connection(client, fake_oauth):
     assert body["connected"] is True
     assert body["google_email"] == "person@acme.com"
     assert body["status"] == "active"
+    assert fake_events.created == ["108200001"]
 
 
 async def test_callback_rejects_bad_state(client, fake_oauth):

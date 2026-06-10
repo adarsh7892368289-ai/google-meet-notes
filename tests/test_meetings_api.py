@@ -22,7 +22,9 @@ class FakeOAuthClient:
     def build_authorization_url(self, state): return f"https://auth?state={state}"
     async def exchange_code(self, code): return TokenBundle("at", 3599, "openid email", "rt")
     async def refresh(self, refresh_token): return TokenBundle("at2", 3599, "openid email")
-    async def fetch_userinfo(self, access_token): return "person@acme.com"
+    async def fetch_userinfo(self, access_token):
+        from app.google.oauth_client import UserInfo
+        return UserInfo(email="person@acme.com", sub="108200001")
     async def revoke(self, token): return None
 
 

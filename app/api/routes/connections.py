@@ -1,17 +1,22 @@
+import logging
 import uuid
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_oauth_client
+from app.api.deps import get_current_user, get_events_client, get_oauth_client
+from app.config import get_settings
 from app.db import get_session
+from app.google.events_client import EventsClient
 from app.google.oauth_client import OAuthClient
 from app.models import User
 from app.security import InvalidStateError, create_oauth_state, verify_oauth_state
-from app.services import connection_service
+from app.services import connection_service, subscription_service
 
 router = APIRouter(prefix="/v1/connections/google", tags=["connections"])
+
+logger = logging.getLogger(__name__)
 
 
 @router.get("/start")
@@ -29,6 +34,7 @@ async def callback(
     state: str,
     session: AsyncSession = Depends(get_session),
     oauth_client: OAuthClient = Depends(get_oauth_client),
+    events_client: EventsClient = Depends(get_events_client),
 ) -> dict:
     try:
         user_id = verify_oauth_state(state)
@@ -52,16 +58,33 @@ async def callback(
             detail="No refresh token returned; re-consent with prompt=consent required",
         )
     try:
-        email = await oauth_client.fetch_userinfo(bundle.access_token)
+        info = await oauth_client.fetch_userinfo(bundle.access_token)
     except httpx.HTTPError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Failed to fetch Google account info",
         ) from exc
-    await connection_service.upsert_connection(
-        session, user=user, bundle=bundle, google_email=email
+
+    conn = await connection_service.upsert_connection(
+        session, user=user, bundle=bundle, google_email=info.email, google_user_id=info.sub
     )
-    return {"connected": True, "google_email": email}
+
+    settings = get_settings()
+    try:
+        await subscription_service.create_for_connection(
+            session,
+            conn=conn,
+            oauth_client=oauth_client,
+            events_client=events_client,
+            topic=settings.workspace_events_topic,
+            ttl_seconds=settings.subscription_ttl_seconds,
+        )
+    except Exception:  # subscription is best-effort; connection still succeeds
+        logger.warning(
+            "failed to create events subscription for user %s", user.id, exc_info=True
+        )
+
+    return {"connected": True, "google_email": info.email}
 
 
 @router.get("")
@@ -85,7 +108,11 @@ async def disconnect(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
     oauth_client: OAuthClient = Depends(get_oauth_client),
+    events_client: EventsClient = Depends(get_events_client),
 ) -> None:
     conn = await connection_service.get_connection(session, current_user)
     if conn is not None:
+        await subscription_service.delete_for_connection(
+            session, conn=conn, oauth_client=oauth_client, events_client=events_client
+        )
         await connection_service.delete_connection(session, conn, oauth_client)
