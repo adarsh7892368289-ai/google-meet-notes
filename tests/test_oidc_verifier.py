@@ -88,3 +88,17 @@ class AllowAllVerifier:
 
 def test_allow_all_verifier_is_usable_in_tests():
     assert AllowAllVerifier().verify("anything").email == "test@local"
+
+
+def test_verify_rejects_missing_issuer():
+    claims = {"email": "e", "email_verified": True}
+    v = _make_verifier(claims, expected_audience="a", expected_email="e")
+    with pytest.raises(PushVerificationError):
+        v.verify("Bearer x")
+
+
+def test_verify_rejects_missing_email_when_expected_email_set():
+    claims = {"iss": "accounts.google.com", "email_verified": True}
+    v = _make_verifier(claims, expected_audience="a", expected_email="expected@x")
+    with pytest.raises(PushVerificationError):
+        v.verify("Bearer x")

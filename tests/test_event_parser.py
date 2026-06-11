@@ -79,3 +79,16 @@ def test_subscription_name_none_when_source_missing():
     )
     ev = parse_push(env)
     assert ev.subscription_name is None
+
+
+def test_parse_rejects_non_dict_json():
+    for payload in [[], "string", 123, None, True]:
+        env = {
+            "message": {
+                "data": base64.b64encode(json.dumps(payload).encode()).decode(),
+                "messageId": "m",
+                "attributes": {},
+            }
+        }
+        with pytest.raises(EventParseError, match="must be a JSON object"):
+            parse_push(env)

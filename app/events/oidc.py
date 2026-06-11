@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+# SECURITY: GooglePushVerifier MUST be configured with a non-empty
+# expected_audience and expected_email before production use. With either left
+# empty, that check is skipped — an empty expected_audience disables `aud`
+# validation entirely (google-auth does not check aud when audience=None), so
+# any Google-signed OIDC token would be accepted. The Phase 4 defaults are
+# empty for local dev; Phase 7 deployment hardening must set PUSH_AUDIENCE and
+# PUSH_SERVICE_ACCOUNT_EMAIL and fail fast if they are missing in production.
 from dataclasses import dataclass
 from typing import Callable, Protocol
 

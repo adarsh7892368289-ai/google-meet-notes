@@ -53,6 +53,8 @@ def parse_push(envelope: dict) -> MeetEvent:
         data = json.loads(decoded)
     except (binascii.Error, ValueError) as exc:
         raise EventParseError(f"invalid data payload: {exc}") from exc
+    if not isinstance(data, dict):
+        raise EventParseError("data payload must be a JSON object")
 
     attributes = message.get("attributes") or {}
     event_type = attributes.get("ce-type", "")
