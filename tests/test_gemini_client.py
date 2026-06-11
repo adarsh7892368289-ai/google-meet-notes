@@ -71,3 +71,22 @@ async def test_count_tokens_proxies_client():
     summarizer = GeminiSummarizer(client=_FakeClient(models), model="m")
     n = await summarizer.count_tokens("hello")
     assert n == 5
+
+
+async def test_summarize_raises_on_truncated_output():
+    class _Candidate:
+        finish_reason = "MAX_TOKENS"
+
+    parsed = NotesContent(summary="Truncated", decisions=[], action_items=[])
+    models = _FakeModels(resp=_Resp(parsed=parsed, candidates=[_Candidate()]))
+    summarizer = GeminiSummarizer(client=_FakeClient(models), model="m")
+    with pytest.raises(SummarizationError, match="incomplete generation"):
+        await summarizer.summarize("transcript")
+
+
+async def test_summarize_raises_on_empty_parsed_summary():
+    parsed = NotesContent(summary="   ", decisions=[], action_items=[])
+    models = _FakeModels(resp=_Resp(parsed=parsed))
+    summarizer = GeminiSummarizer(client=_FakeClient(models), model="m")
+    with pytest.raises(SummarizationError, match="empty completion"):
+        await summarizer.summarize("transcript")

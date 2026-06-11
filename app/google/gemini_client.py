@@ -59,11 +59,22 @@ class GeminiSummarizer:
         feedback = getattr(resp, "prompt_feedback", None)
         if feedback is not None and getattr(feedback, "block_reason", None):
             raise SummarizationError(f"prompt blocked: {feedback.block_reason}")
-        if not getattr(resp, "candidates", None) and not getattr(resp, "text", ""):
+
+        candidates = getattr(resp, "candidates", None)
+        if candidates:
+            # A non-STOP finish reason (MAX_TOKENS, SAFETY, RECITATION, ...) means the
+            # output is truncated or filtered; don't silently accept partial notes.
+            finish_reason = getattr(candidates[0], "finish_reason", None)
+            if finish_reason and finish_reason not in ("STOP", "FINISH_REASON_UNSPECIFIED"):
+                raise SummarizationError(f"incomplete generation: {finish_reason}")
+
+        if not candidates and not getattr(resp, "text", ""):
             raise SummarizationError("empty completion")
 
         parsed = getattr(resp, "parsed", None)
         if isinstance(parsed, NotesContent):
+            if not parsed.summary.strip():
+                raise SummarizationError("empty completion")
             return parsed
         text = getattr(resp, "text", "") or ""
         if not text.strip():
