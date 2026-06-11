@@ -144,3 +144,24 @@ async def test_handle_event_without_conference_record_is_ignored(db_session):
         select(ProcessedEvent).where(ProcessedEvent.message_id == "m-life")
     )
     assert ledger is not None
+
+
+async def test_transcript_preserved_when_later_event_has_no_transcript(db_session):
+    await _conn_with_sub(db_session)
+    queue = NullJobQueue()
+    # transcript event first sets the transcript
+    await event_service.handle_event(
+        db_session, parse_push(_transcript_env(message_id="m1", cr="cr-keep")), queue
+    )
+    # a later conference.started event for the SAME conference carries no transcript
+    started = _envelope(
+        message_id="m2",
+        ce_type="google.workspace.meet.conference.v2.started",
+        ce_source="//workspaceevents.googleapis.com/subscriptions/sub-1",
+        data={"conferenceRecord": {"name": "conferenceRecords/cr-keep"}},
+    )
+    await event_service.handle_event(db_session, parse_push(started), queue)
+    conf = await db_session.scalar(
+        select(Conference).where(Conference.conference_record_name == "conferenceRecords/cr-keep")
+    )
+    assert conf.transcript_resource_name == "conferenceRecords/cr-keep/transcripts/t-1"

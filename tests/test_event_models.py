@@ -67,3 +67,30 @@ async def test_processed_event_unique_message_id(db_session):
     await db_session.commit()
     await db_session.refresh(ev)
     assert ev.id is not None
+
+
+async def test_conference_record_name_is_unique(db_session):
+    from sqlalchemy.exc import IntegrityError
+    conn = await _conn(db_session)
+    db_session.add(Conference(
+        oauth_connection_id=conn.id, conference_record_name="conferenceRecords/dup",
+        pipeline_state="pending",
+    ))
+    await db_session.commit()
+    db_session.add(Conference(
+        oauth_connection_id=conn.id, conference_record_name="conferenceRecords/dup",
+        pipeline_state="pending",
+    ))
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
+
+
+async def test_processed_event_message_id_is_unique(db_session):
+    from sqlalchemy.exc import IntegrityError
+    db_session.add(ProcessedEvent(message_id="dup", event_type="t"))
+    await db_session.commit()
+    db_session.add(ProcessedEvent(message_id="dup", event_type="t"))
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+    await db_session.rollback()
