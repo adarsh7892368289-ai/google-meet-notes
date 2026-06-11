@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     push_audience: str = ""
     push_service_account_email: str = ""
     subscription_ttl_seconds: int = 604800
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_chunk_token_threshold: int = 600000
+    redis_url: str = ""
+    notes_default_title: str = "Meeting Notes"
 
 
 @lru_cache

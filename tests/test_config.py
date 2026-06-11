@@ -42,3 +42,18 @@ def test_events_settings_have_defaults(monkeypatch):
     assert s.push_service_account_email == ""
     assert s.subscription_ttl_seconds == 604800
     get_settings.cache_clear()
+
+
+def test_phase5_settings_have_defaults(monkeypatch):
+    for var in ("GEMINI_API_KEY", "GEMINI_MODEL", "REDIS_URL", "GEMINI_CHUNK_TOKEN_THRESHOLD"):
+        monkeypatch.delenv(var, raising=False)
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    s = get_settings()
+    assert s.gemini_api_key == ""
+    assert s.gemini_model == "gemini-2.5-flash"
+    assert s.redis_url == ""
+    assert s.gemini_chunk_token_threshold == 600000
+    assert s.notes_default_title == "Meeting Notes"
+    get_settings.cache_clear()
