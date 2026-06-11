@@ -10,6 +10,17 @@
 
 ---
 
+## Follow-ups discovered during execution (carry into later phases)
+
+These were surfaced by code review during Phase 4 execution, judged out-of-scope for this phase, and deferred:
+
+- **Phase 7 — OIDC webhook hardening (security):** `GooglePushVerifier` skips `aud` validation when `push_audience` is empty (`verify_oauth2_token(audience=None)` does not check `aud`) and skips the service-account check when `push_service_account_email` is empty. Phase-4 dev defaults are both empty. Phase 7 must fail fast at startup when `app_env != "local"` and either is unset. Risk documented in a comment block at the top of `app/events/oidc.py`.
+- **Phase 7 — reconciliation must backfill dropped conferences:** `event_service.handle_event` commits the `processed_events` ledger BEFORE the `conferences` upsert, so a non-transient failure of the conference commit lets the redelivery dedup as "duplicate" and the conference is never created. The Phase 7 sweeper/reconciliation must list recent `conferenceRecords` and create any missing rows.
+- **Phase 5 — enqueue failure handling:** `queue.enqueue_notes_pipeline(...)` is not wrapped in try/except (harmless with `NullJobQueue`). When the real arq/Redis queue lands, a Redis outage would 500 → redelivery dedups → orphaned `pending` conference. Phase 5 should wrap+return 500 or rely on the Phase 7 sweeper to pick up orphaned `pending` rows.
+- **Phase 5 — resolve `conferences.meeting_id`:** intentionally left NULL this phase; the worker resolves it via `conferenceRecords.get` → `space` → `meetings.meet_space_name`.
+
+---
+
 ## Research findings this plan is built on (verified June 2026)
 
 These shaped the design; do not re-litigate them mid-implementation.
