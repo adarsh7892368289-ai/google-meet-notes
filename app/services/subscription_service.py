@@ -60,6 +60,23 @@ async def create_for_connection(
     access_token = await connection_service.get_valid_access_token(
         session, conn, oauth_client
     )
+
+    sub = await get_for_connection(session, conn)
+    # On reconnect a row already exists; best-effort delete the previous remote
+    # subscription so we don't leak an orphaned (and TTL-lived) duplicate that
+    # would fire events under a name no longer mapped to any local row.
+    if sub is not None:
+        try:
+            await events_client.delete_subscription(
+                access_token, subscription_name=sub.subscription_name
+            )
+        except Exception as exc:
+            logger.warning(
+                "failed to delete stale remote subscription %s: %s",
+                sub.subscription_name,
+                exc,
+            )
+
     result = await events_client.create_subscription(
         access_token,
         google_user_id=conn.google_user_id,
@@ -67,7 +84,6 @@ async def create_for_connection(
         ttl_seconds=ttl_seconds,
     )
 
-    sub = await get_for_connection(session, conn)
     if sub is None:
         sub = EventSubscription(oauth_connection_id=conn.id)
         session.add(sub)

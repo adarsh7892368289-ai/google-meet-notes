@@ -7,8 +7,9 @@ from __future__ import annotations
 # any Google-signed OIDC token would be accepted. The Phase 4 defaults are
 # empty for local dev; Phase 7 deployment hardening must set PUSH_AUDIENCE and
 # PUSH_SERVICE_ACCOUNT_EMAIL and fail fast if they are missing in production.
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 _VALID_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
 

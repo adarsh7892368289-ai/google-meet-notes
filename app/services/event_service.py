@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 
 from sqlalchemy import select
@@ -94,6 +92,14 @@ async def handle_event(
         if conf is None:
             logger.warning("conference vanished after race for %s", event.message_id)
             return "ignored"
+        # The rolled-back insert discarded our transcript assignment; re-apply it
+        # to the winner's row if it doesn't already have one.
+        if (
+            event.transcript_resource_name is not None
+            and conf.transcript_resource_name is None
+        ):
+            conf.transcript_resource_name = event.transcript_resource_name
+            await session.commit()
 
     await session.refresh(conf)
     await queue.enqueue_notes_pipeline(str(conf.id))
