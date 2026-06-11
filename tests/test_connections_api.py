@@ -40,6 +40,7 @@ class FakeOAuthClient:
 class FakeEventsClient:
     def __init__(self):
         self.created = []
+        self.deleted = []
 
     async def create_subscription(self, access_token, *, google_user_id, topic, ttl_seconds):
         from app.google.events_client import SubscriptionResult
@@ -51,7 +52,7 @@ class FakeEventsClient:
         return SubscriptionResult(subscription_name, "2026-06-27T00:00:00Z", "ACTIVE")
 
     async def delete_subscription(self, access_token, *, subscription_name):
-        pass
+        self.deleted.append(subscription_name)
 
 
 @pytest.fixture
@@ -187,3 +188,16 @@ async def test_callback_returns_400_for_unknown_user(client, fake_oauth):
     state = create_oauth_state(str(uuid.uuid4()))
     resp = await client.get(f"/v1/connections/google/callback?code=abc&state={state}")
     assert resp.status_code == 400
+
+
+async def test_disconnect_tears_down_subscription(client, fake_oauth, fake_events):
+    token = await _register(client)
+    me = await client.get("/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+    state = create_oauth_state(me.json()["id"])
+    await client.get(f"/v1/connections/google/callback?code=abc&state={state}")
+    # a subscription row was created on connect
+    resp = await client.delete(
+        "/v1/connections/google", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 204
+    assert fake_events.deleted == ["subscriptions/sub-1"]

@@ -118,3 +118,45 @@ async def test_get_by_subscription_name(db_session):
     found = await subscription_service.get_by_subscription_name(db_session, "subscriptions/sub-1")
     assert found is not None
     assert found.oauth_connection_id == conn.id
+
+
+class FailingDeleteEventsClient(FakeEventsClient):
+    async def delete_subscription(self, access_token, *, subscription_name):
+        raise RuntimeError("remote boom")
+
+
+async def test_delete_for_connection_removes_local_row_even_if_remote_delete_fails(db_session):
+    conn = await _conn(db_session)
+    events = FailingDeleteEventsClient()
+    await subscription_service.create_for_connection(
+        db_session, conn=conn, oauth_client=FakeOAuthClient(), events_client=events,
+        topic="projects/p/topics/meet-events", ttl_seconds=604800,
+    )
+    await subscription_service.delete_for_connection(
+        db_session, conn=conn, oauth_client=FakeOAuthClient(), events_client=events,
+    )
+    row = await db_session.scalar(
+        select(EventSubscription).where(EventSubscription.oauth_connection_id == conn.id)
+    )
+    assert row is None
+
+
+async def test_create_for_connection_deletes_previous_subscription_on_reconnect(db_session):
+    conn = await _conn(db_session)
+    events = FakeEventsClient()
+    await subscription_service.create_for_connection(
+        db_session, conn=conn, oauth_client=FakeOAuthClient(), events_client=events,
+        topic="projects/p/topics/meet-events", ttl_seconds=604800,
+    )
+    # second connect (reconnect) for the same connection
+    await subscription_service.create_for_connection(
+        db_session, conn=conn, oauth_client=FakeOAuthClient(), events_client=events,
+        topic="projects/p/topics/meet-events", ttl_seconds=604800,
+    )
+    # the previous remote subscription was deleted before the new create
+    assert events.deleted == ["subscriptions/sub-1"]
+    # still exactly one local row
+    rows = (await db_session.scalars(
+        select(EventSubscription).where(EventSubscription.oauth_connection_id == conn.id)
+    )).all()
+    assert len(rows) == 1
