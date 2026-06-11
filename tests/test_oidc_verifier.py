@@ -102,3 +102,35 @@ def test_verify_rejects_missing_email_when_expected_email_set():
     v = _make_verifier(claims, expected_audience="a", expected_email="expected@x")
     with pytest.raises(PushVerificationError):
         v.verify("Bearer x")
+
+
+def test_verify_forwards_expected_audience():
+    captured = {}
+
+    def capturing_verify(token, request, audience=None):
+        captured["audience"] = audience
+        return {"iss": "accounts.google.com", "email": "e@x", "email_verified": True}
+
+    v = GooglePushVerifier(
+        expected_audience="https://app.example/hook",
+        expected_email="e@x",
+        _verify_fn=capturing_verify,
+    )
+    v.verify("Bearer x")
+    assert captured["audience"] == "https://app.example/hook"
+
+
+def test_verify_forwards_none_audience_when_empty():
+    captured = {}
+
+    def capturing_verify(token, request, audience=None):
+        captured["audience"] = audience
+        return {"iss": "accounts.google.com", "email": "e@x", "email_verified": True}
+
+    v = GooglePushVerifier(
+        expected_audience="",
+        expected_email="e@x",
+        _verify_fn=capturing_verify,
+    )
+    v.verify("Bearer x")
+    assert captured["audience"] is None

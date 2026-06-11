@@ -149,3 +149,23 @@ async def test_webhook_acks_non_json_body(client, allow_verifier, shared_queue):
         headers={"Authorization": "Bearer t", "Content-Type": "text/html"},
     )
     assert resp.status_code == 200
+
+
+class BoomQueue:
+    async def enqueue_notes_pipeline(self, conference_id: str) -> None:
+        raise RuntimeError("boom")
+
+
+async def test_webhook_returns_500_on_handler_error(client, db_session, allow_verifier):
+    from app.api.deps import get_job_queue
+    await _seed_subscription(db_session)
+    app.dependency_overrides[get_job_queue] = lambda: BoomQueue()
+    try:
+        resp = await client.post(
+            "/v1/webhooks/google/events",
+            json=_push_body(),
+            headers={"Authorization": "Bearer t"},
+        )
+        assert resp.status_code == 500
+    finally:
+        app.dependency_overrides.pop(get_job_queue, None)
