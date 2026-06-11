@@ -1,3 +1,4 @@
+import json
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -30,11 +31,12 @@ async def receive_events(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid push token"
         ) from exc
 
-    envelope = await request.json()
     try:
+        envelope = await request.json()
         event = parse_push(envelope)
-    except EventParseError as exc:
-        # Ack poison messages so Pub/Sub stops redelivering them.
+    except (json.JSONDecodeError, ValueError, EventParseError) as exc:
+        # Ack poison messages (bad JSON or malformed CloudEvent) so Pub/Sub
+        # stops redelivering them.
         logger.warning("unparseable pub/sub push acked: %s", exc)
         return Response(status_code=status.HTTP_200_OK)
 

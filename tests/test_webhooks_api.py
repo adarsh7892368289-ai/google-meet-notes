@@ -140,3 +140,12 @@ async def test_webhook_acks_unmapped_subscription(client, allow_verifier, shared
         headers={"Authorization": "Bearer t"},
     )
     assert resp.status_code == 200
+
+
+async def test_webhook_acks_non_json_body(client, allow_verifier, shared_queue):
+    resp = await client.post(
+        "/v1/webhooks/google/events",
+        content=b"<html>not json</html>",
+        headers={"Authorization": "Bearer t", "Content-Type": "text/html"},
+    )
+    assert resp.status_code == 200

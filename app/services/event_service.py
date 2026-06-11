@@ -29,6 +29,9 @@ async def handle_event(
         return "duplicate"
 
     # Record the message first so retries/duplicates are dropped even if the rest fails.
+    # Tradeoff: if the conference step below fails non-transiently the ledger still
+    # dedups the redelivery, so the Phase 7 sweeper/reconciliation must backfill any
+    # conference that never reached "enqueued".
     ledger = ProcessedEvent(
         message_id=event.message_id,
         event_type=event.event_type,
