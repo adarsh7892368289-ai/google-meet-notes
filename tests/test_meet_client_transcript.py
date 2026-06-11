@@ -86,3 +86,21 @@ async def test_get_conference_record_404_raises():
 
     with pytest.raises(httpx.HTTPStatusError):
         await _client(handler).get_conference_record("at-1", "conferenceRecords/gone")
+
+
+async def test_list_transcript_entries_empty_returns_empty():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    entries = await _client(handler).list_transcript_entries(
+        "at-1", "conferenceRecords/cr-1/transcripts/t-1"
+    )
+    assert entries == []
+
+
+async def test_list_participants_empty_returns_empty():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={})
+
+    parts = await _client(handler).list_participants("at-1", "conferenceRecords/cr-1")
+    assert parts == []

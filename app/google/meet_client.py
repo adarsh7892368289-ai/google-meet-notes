@@ -161,7 +161,7 @@ class GoogleMeetClient:
                     )
                     participants.append(
                         ParticipantInfo(
-                            name=p["name"], display_name=user.get("displayName", "")
+                            name=p.get("name", ""), display_name=user.get("displayName", "")
                         )
                     )
                 page_token = data.get("nextPageToken")
