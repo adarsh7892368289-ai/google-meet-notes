@@ -28,8 +28,16 @@ async def _access_token(
 async def _map_meeting(session: AsyncSession, conference: Conference, space: str | None) -> None:
     if conference.meeting_id is not None or not space:
         return
+    conn = await session.get(OAuthConnection, conference.oauth_connection_id)
+    if conn is None:
+        return
+    # Scope to the conference owner's meetings: a conference only ever maps to a
+    # meeting created by the same user, even though Meet space names are globally
+    # unique. This keeps the ownership invariant explicit rather than assumed.
     meeting = await session.scalar(
-        select(Meeting).where(Meeting.meet_space_name == space)
+        select(Meeting).where(
+            Meeting.meet_space_name == space, Meeting.user_id == conn.user_id
+        )
     )
     if meeting is not None:
         conference.meeting_id = meeting.id

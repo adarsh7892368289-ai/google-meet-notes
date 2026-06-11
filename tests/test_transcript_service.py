@@ -120,3 +120,26 @@ async def test_fetch_empty_transcript_stores_empty(db_session):
     t = await db_session.scalar(select(Transcript).where(Transcript.conference_id == conf.id))
     assert t is not None
     assert decrypt(t.full_text) == ""
+
+
+async def test_fetch_does_not_map_meeting_owned_by_another_user(db_session):
+    from datetime import datetime, timezone
+    # A different user owns a meeting with the same space name; it must NOT be mapped.
+    other = User(email="other@acme.com", name="O", hashed_password="x")
+    db_session.add(other)
+    await db_session.commit()
+    await db_session.refresh(other)
+    db_session.add(Meeting(
+        user_id=other.id, title="Their Meeting",
+        start_time=datetime(2026, 6, 11, tzinfo=timezone.utc),
+        end_time=datetime(2026, 6, 11, tzinfo=timezone.utc), attendees=[],
+        meet_space_name="spaces/SERVERID", notes_enabled=True, notes_config={},
+    ))
+    await db_session.commit()
+
+    conf = await _conf_with_meeting(db_session, with_meeting=False)
+    await transcript_service.fetch_transcript(
+        db_session, conference=conf, oauth_client=FakeOAuthClient(), meet_client=FakeMeetClient()
+    )
+    await db_session.refresh(conf)
+    assert conf.meeting_id is None
