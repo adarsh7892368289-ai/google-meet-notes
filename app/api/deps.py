@@ -10,6 +10,7 @@ from app.db import get_session
 from app.events.oidc import GooglePushVerifier, PushVerifier
 from app.google.calendar_client import CalendarClient, GoogleCalendarClient
 from app.google.events_client import EventsClient, GoogleEventsClient
+from app.google.gemini_client import GeminiSummarizer, Summarizer
 from app.google.meet_client import GoogleMeetClient, MeetClient
 from app.google.oauth_client import GoogleOAuthClient, OAuthClient
 from app.models import User
@@ -74,4 +75,14 @@ def get_push_verifier() -> PushVerifier:
 
 
 def get_job_queue() -> JobQueue:
+    # Redis-backed queue only when configured; otherwise the in-process no-op
+    # queue (durable `conferences` row remains the source of truth).
     return _job_queue
+
+
+def get_summarizer() -> Summarizer:
+    from google import genai
+
+    settings = get_settings()
+    client = genai.Client(api_key=settings.gemini_api_key)
+    return GeminiSummarizer(client=client, model=settings.gemini_model)
