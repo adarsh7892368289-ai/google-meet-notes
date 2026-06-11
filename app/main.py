@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routes import auth, connections, health, meetings
+from app.api.routes import auth, connections, health, meetings, webhooks
 
 
 def create_app() -> FastAPI:
@@ -9,6 +9,7 @@ def create_app() -> FastAPI:
     application.include_router(auth.router)
     application.include_router(connections.router)
     application.include_router(meetings.router)
+    application.include_router(webhooks.router)
     return application
 
 

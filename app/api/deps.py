@@ -7,14 +7,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.db import get_session
+from app.events.oidc import GooglePushVerifier, PushVerifier
 from app.google.calendar_client import CalendarClient, GoogleCalendarClient
 from app.google.events_client import EventsClient, GoogleEventsClient
 from app.google.meet_client import GoogleMeetClient, MeetClient
 from app.google.oauth_client import GoogleOAuthClient, OAuthClient
 from app.models import User
+from app.queue import JobQueue, NullJobQueue
 from app.security import decode_access_token
 
 _bearer = HTTPBearer(auto_error=True)
+_job_queue = NullJobQueue()
 
 
 async def get_current_user(
@@ -60,3 +63,15 @@ def get_meet_client() -> MeetClient:
 
 def get_events_client() -> EventsClient:
     return GoogleEventsClient()
+
+
+def get_push_verifier() -> PushVerifier:
+    settings = get_settings()
+    return GooglePushVerifier(
+        expected_audience=settings.push_audience,
+        expected_email=settings.push_service_account_email,
+    )
+
+
+def get_job_queue() -> JobQueue:
+    return _job_queue
