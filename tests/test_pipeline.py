@@ -148,3 +148,42 @@ async def test_run_pipeline_missing_conference_is_noop(db_session):
         meet_client=FakeMeetClient(), summarizer=FakeSummarizer(), model="m",
         chunk_threshold=600000, default_title="Meeting Notes",
     )
+
+
+async def test_run_pipeline_stage2_fails_then_retry_resumes(db_session):
+    class BoomSummarizer(FakeSummarizer):
+        def __init__(self):
+            super().__init__()
+            self.should_fail = True
+
+        async def summarize(self, transcript):
+            if self.should_fail:
+                raise RuntimeError("gemini quota exceeded")
+            return await super().summarize(transcript)
+
+    conf = await _conf(db_session)
+    meet = FakeMeetClient()
+    summ = BoomSummarizer()
+
+    with pytest.raises(RuntimeError):
+        await pipeline.run_pipeline(
+            db_session, conference_id=conf.id, oauth_client=FakeOAuthClient(),
+            meet_client=meet, summarizer=summ, model="m", chunk_threshold=600000,
+            default_title="Meeting Notes",
+        )
+    await db_session.refresh(conf)
+    assert conf.pipeline_state == "failed"
+    assert conf.attempts == 1
+    assert await db_session.scalar(select(Transcript).where(Transcript.conference_id == conf.id)) is not None
+    assert meet.entry_calls == 1
+
+    summ.should_fail = False
+    await pipeline.run_pipeline(
+        db_session, conference_id=conf.id, oauth_client=FakeOAuthClient(),
+        meet_client=meet, summarizer=summ, model="m", chunk_threshold=600000,
+        default_title="Meeting Notes",
+    )
+    await db_session.refresh(conf)
+    assert conf.pipeline_state == "notes_generated"
+    assert meet.entry_calls == 2  # stage 1 re-ran (wasteful but safe)
+    assert await db_session.scalar(select(Notes).where(Notes.conference_id == conf.id)) is not None

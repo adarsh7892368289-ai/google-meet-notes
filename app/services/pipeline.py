@@ -13,6 +13,15 @@ logger = logging.getLogger(__name__)
 
 # Ordered pipeline states. Terminal success state for Phase 5 is "notes_generated".
 # Phase 6 appends "doc_created" and "emailed".
+#
+# "failed" maps to -1, below every real state, so a retry re-opens all stage guards
+# and re-runs from the top. That is safe in Phase 5 because both stages are idempotent
+# upserts (re-running stage 1 after a stage-2 failure just overwrites the transcript
+# row, no duplicate side effects) — wasteful (a redundant Meet fetch) but correct.
+# IMPORTANT for Phase 6: the doc-creation and email stages have NON-idempotent external
+# side effects, so re-running them on retry would double-create/double-send. Phase 6 must
+# track per-stage completion (e.g. gate on notes.doc_id / notes.emailed_at) rather than
+# relying on this re-run-from-top behavior.
 _ORDER = {
     "pending": 0,
     "transcript_fetched": 1,
@@ -45,6 +54,10 @@ async def run_pipeline(
         logger.info("pipeline: conference %s already complete", conference_id)
         return
 
+    # fetch_transcript / generate_notes commit internally; the pipeline_state update
+    # commits in a separate transaction. A crash in that window leaves a committed
+    # transcript/notes row with an un-advanced state — safe, because the retry re-runs
+    # the idempotent stage and then advances the state.
     try:
         if not _reached(conference.pipeline_state, "transcript_fetched"):
             await transcript_service.fetch_transcript(
