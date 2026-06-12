@@ -8,6 +8,7 @@ own Google accounts.
 
 > Full design: [`docs/superpowers/specs/2026-06-09-meet-gemini-notes-design.md`](docs/superpowers/specs/2026-06-09-meet-gemini-notes-design.md).
 > Phase-by-phase implementation plans live in [`docs/superpowers/plans/`](docs/superpowers/plans/).
+> **Running it live (local + ngrok): [`docs/LIVE_SETUP.md`](docs/LIVE_SETUP.md).**
 
 ---
 
