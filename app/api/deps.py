@@ -18,7 +18,16 @@ from app.queue import JobQueue, NullJobQueue
 from app.security import decode_access_token
 
 _bearer = HTTPBearer(auto_error=True)
-_job_queue = NullJobQueue()
+
+# The active job queue. Defaults to the in-process no-op; the app lifespan
+# (see app/main.py) swaps in a Redis-backed RealJobQueue at startup when
+# REDIS_URL is configured.
+_job_queue: JobQueue = NullJobQueue()
+
+
+def set_job_queue(queue: JobQueue) -> None:
+    global _job_queue
+    _job_queue = queue
 
 
 async def get_current_user(

@@ -49,10 +49,15 @@ You  ── GET notes ──►  Service ──►  { title, summary, decisions,
 - A resumable pipeline (`pending → transcript_fetched → notes_generated`)
 - Read endpoints for notes, transcripts, occurrences, and on-demand re-generation
 
+- The background worker auto-trigger: when `REDIS_URL` is set, the API enqueues note generation
+  to the `arq` worker on each "transcript ready" webhook (run the worker with
+  `arq app.worker.WorkerSettings`).
+
 **Not yet built:**
 - **Delivery (Phase 6):** writing the notes into a Google Doc and emailing attendees.
-- **Production wiring:** the always-on background worker (needs Redis) and the Google Cloud
-  Pub/Sub setup are scaffolded but not connected — see [Limitations](#limitations--prerequisites).
+- **Cloud deployment:** running this on a hosted server (vs. local + ngrok) and the related
+  production hardening — see [Limitations](#limitations--prerequisites) and
+  [`docs/LIVE_SETUP.md`](docs/LIVE_SETUP.md).
 
 ---
 

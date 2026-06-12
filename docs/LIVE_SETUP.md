@@ -6,14 +6,11 @@ automatically. This targets **local development** — everything runs on your la
 **ngrok** exposing your local server to Google so OAuth redirects and the "transcript ready"
 push can reach it.
 
-> **Read this first — one code change is still pending.** Today the API's job queue is a no-op
-> (`get_job_queue` in `app/api/deps.py` always returns `NullJobQueue`). That means the webhook
-> will *receive* "transcript ready" and record a `pending` conference, but it will **not yet
-> auto-trigger the worker**, even with Redis configured. Until that wiring lands, you generate
-> notes by either (a) running `python scripts/proof_run.py` (simulated transcript), or (b)
-> manually enqueuing/running the pipeline for a real conference (see
-> [Step 9](#step-9--generate-notes-the-temporary-manual-trigger)). The change to make it fully
-> automatic is small; ask for it when you're ready. Everything else in this runbook is real.
+> **Automatic notes are wired up.** When `REDIS_URL` is set in `.env`, the API connects to
+> Redis at startup and the webhook auto-enqueues note generation to the `arq` worker — so a real
+> meeting's transcript generates notes hands-free (you just need the worker running, Step 8). If
+> `REDIS_URL` is empty, the webhook still records a durable `pending` conference (no work lost),
+> and you can finish it with the manual trigger in [Step 9](#step-9-temporary--generate-notes-the-manual-trigger).
 
 > **Hard prerequisite:** any Google account that *creates* meetings must be on **Google
 > Workspace Business Standard or higher**. Free/personal Gmail does **not** produce Meet
@@ -223,8 +220,8 @@ produces a transcript. End the meeting.
 
 **e. Notes get generated**
 A minute or two after the meeting ends, Google publishes "transcript ready" → Pub/Sub pushes it
-to your webhook → (once the queue wiring lands) the worker fetches the transcript, summarizes it,
-and saves the notes.
+to your webhook → the API enqueues the job → the `arq` worker fetches the transcript, summarizes
+it with Gemini, and saves the notes. (Requires `REDIS_URL` set and the worker running, per Step 8.)
 
 **f. Read the notes**
 ```bash

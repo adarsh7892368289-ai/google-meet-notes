@@ -28,3 +28,21 @@ def test_get_summarizer_builds_gemini_summarizer(monkeypatch):
     from app.google.gemini_client import GeminiSummarizer
     s = deps.get_summarizer()
     assert isinstance(s, GeminiSummarizer)
+
+
+def test_set_job_queue_overrides_active_queue(monkeypatch):
+    from app.api import deps
+    from app.queue import NullJobQueue
+
+    class Sentinel:
+        async def enqueue_notes_pipeline(self, conference_id: str) -> None:
+            pass
+
+    original = deps.get_job_queue()
+    try:
+        sentinel = Sentinel()
+        deps.set_job_queue(sentinel)
+        assert deps.get_job_queue() is sentinel
+    finally:
+        deps.set_job_queue(original)
+    assert isinstance(deps.get_job_queue(), NullJobQueue)
