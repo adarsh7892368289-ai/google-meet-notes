@@ -139,3 +139,67 @@ async def test_cannot_access_other_users_conference(client, db_session):
     _, conf = await _seed(db_session, other.id)
     resp = await client.get(f"/v1/conferences/{conf.id}/notes", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 404
+
+
+async def test_regenerate_409_when_no_transcript(client, db_session, fake_summarizer):
+    token, uid = await _register(client)
+    _, conf = await _seed(db_session, uid, with_transcript=False)
+    resp = await client.post(
+        f"/v1/conferences/{conf.id}/notes:regenerate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 409
+
+
+async def test_cannot_regenerate_other_users_conference(client, db_session, fake_summarizer):
+    token, uid = await _register(client)
+    other = User(email="other@acme.com", name="X", hashed_password="x")
+    db_session.add(other)
+    await db_session.commit()
+    await db_session.refresh(other)
+    _, conf = await _seed(db_session, other.id)
+    resp = await client.post(
+        f"/v1/conferences/{conf.id}/notes:regenerate",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 404
+
+
+async def test_meeting_notes_404_when_no_occurrences(client, db_session):
+    token, uid = await _register(client)
+    meeting = Meeting(
+        user_id=uid, title="Future", start_time=datetime(2026, 7, 1, tzinfo=timezone.utc),
+        end_time=datetime(2026, 7, 1, tzinfo=timezone.utc), attendees=[],
+        meet_space_name="spaces/Z", notes_enabled=True, notes_config={},
+    )
+    db_session.add(meeting)
+    await db_session.commit()
+    await db_session.refresh(meeting)
+    resp = await client.get(
+        f"/v1/meetings/{meeting.id}/notes", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 404
+
+
+async def test_transcript_404_when_full_text_nulled(client, db_session):
+    token, uid = await _register(client)
+    _, conf = await _seed(db_session, uid, with_transcript=False)
+    db_session.add(Transcript(conference_id=conf.id, full_text=None, language="en-US", speaker_map={}))
+    await db_session.commit()
+    resp = await client.get(
+        f"/v1/conferences/{conf.id}/transcript", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 404
+
+
+async def test_cannot_list_other_users_meeting_conferences(client, db_session):
+    token, uid = await _register(client)
+    other = User(email="other@acme.com", name="X", hashed_password="x")
+    db_session.add(other)
+    await db_session.commit()
+    await db_session.refresh(other)
+    meeting, _ = await _seed(db_session, other.id)
+    resp = await client.get(
+        f"/v1/meetings/{meeting.id}/conferences", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 404
