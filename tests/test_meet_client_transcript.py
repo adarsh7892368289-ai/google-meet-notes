@@ -104,3 +104,27 @@ async def test_list_participants_empty_returns_empty():
 
     parts = await _client(handler).list_participants("at-1", "conferenceRecords/cr-1")
     assert parts == []
+
+
+async def test_list_participants_paginates():
+    pages = {
+        None: {"participants": [
+                   {"name": "conferenceRecords/cr-1/participants/p1",
+                    "signedinUser": {"user": "users/u1", "displayName": "Alice"}}],
+               "nextPageToken": "tok2"},
+        "tok2": {"participants": [
+                     {"name": "conferenceRecords/cr-1/participants/p2",
+                      "anonymousUser": {"displayName": "Guest"}}]},
+    }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/v2/conferenceRecords/cr-1/participants"
+        token = request.url.params.get("pageToken")
+        return httpx.Response(200, json=pages[token])
+
+    parts = await _client(handler).list_participants("at-1", "conferenceRecords/cr-1")
+    names = {p.name: p.display_name for p in parts}
+    assert names == {
+        "conferenceRecords/cr-1/participants/p1": "Alice",
+        "conferenceRecords/cr-1/participants/p2": "Guest",
+    }

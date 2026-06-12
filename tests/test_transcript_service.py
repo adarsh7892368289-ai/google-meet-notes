@@ -122,6 +122,24 @@ async def test_fetch_empty_transcript_stores_empty(db_session):
     assert decrypt(t.full_text) == ""
 
 
+async def test_fetch_attributes_unmapped_participant_as_unknown(db_session):
+    class UnmappedMeet(FakeMeetClient):
+        async def list_transcript_entries(self, access_token, transcript_resource_name):
+            return [
+                TranscriptEntryInfo(participant="conferenceRecords/cr-1/participants/p1", text="hi", language_code="en-US"),
+                TranscriptEntryInfo(participant="conferenceRecords/cr-1/participants/p999", text="who am i", language_code="en-US"),
+            ]
+
+    conf = await _conf_with_meeting(db_session)
+    await transcript_service.fetch_transcript(
+        db_session, conference=conf, oauth_client=FakeOAuthClient(), meet_client=UnmappedMeet()
+    )
+    t = await db_session.scalar(select(Transcript).where(Transcript.conference_id == conf.id))
+    text = decrypt(t.full_text)
+    assert "Alice: hi" in text           # p1 is in the participant map
+    assert "Unknown: who am i" in text   # p999 is not -> Unknown fallback
+
+
 async def test_fetch_does_not_map_meeting_owned_by_another_user(db_session):
     from datetime import datetime, timezone
     # A different user owns a meeting with the same space name; it must NOT be mapped.
