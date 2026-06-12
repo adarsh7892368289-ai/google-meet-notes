@@ -10,6 +10,14 @@
 
 ---
 
+## Follow-ups for later phases (discovered during execution)
+
+- **Phase 6 — gate delivery stages on completion flags, not retry-from-top:** the pipeline's `failed` state re-opens all stage guards on retry. Phase 5 stages are idempotent upserts so re-running is safe, but Phase 6's Doc-creation and email stages are NON-idempotent external side effects. Phase 6 must skip doc creation when `notes.doc_id` is set and skip email when `notes.emailed_at` is set, rather than relying on `pipeline_state` ordering. (Clarifying comment is at the top of `_ORDER` in `app/services/pipeline.py`.)
+- **Wire the live arq worker + RealJobQueue when Redis is provisioned:** `app/worker.py` and `RealJobQueue` are built and unit-tested but `get_job_queue` still returns `NullJobQueue` in the API process. When Redis lands, construct an arq pool at app startup and have `get_job_queue` return a `RealJobQueue`, and run the worker via `arq app.worker.WorkerSettings`.
+- **A non-empty `GEMINI_API_KEY` is required at runtime:** `genai.Client(api_key="")` raises `ValueError` (validation, no network). The worker's `notes_pipeline` and the `:regenerate` endpoint build a real client with no fallback, so notes generation / regenerate will 500 without a configured key. Set a real key for live verification.
+
+---
+
 ## Decisions locked for this phase
 
 1. **Redis is deferred.** Per the project decision, we build and unit-test the entire pipeline WITHOUT a running Redis. Verified: importing `arq` and defining `WorkerSettings`/task functions does NOT connect to Redis (connection happens only at `create_pool(...)` / worker start). arq tasks are plain coroutines, unit-tested by calling them with a hand-built `ctx` dict. The `RealJobQueue` (which needs a pool) is defined but only instantiated when `REDIS_URL` is configured; otherwise the app keeps using `NullJobQueue`.
