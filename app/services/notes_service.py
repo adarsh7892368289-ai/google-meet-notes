@@ -61,7 +61,7 @@ async def _summarize_text(
     combined = "\n\n".join(
         f"Section {i + 1} summary: {p.summary}\n"
         f"Decisions: {'; '.join(p.decisions)}\n"
-        f"Action items: {'; '.join(a.what for a in p.action_items)}"
+        f"Action items: {'; '.join(f'{a.who}: {a.what}' if a.who else a.what for a in p.action_items)}"
         for i, p in enumerate(partials)
     )
     return await summarizer.summarize(combined)

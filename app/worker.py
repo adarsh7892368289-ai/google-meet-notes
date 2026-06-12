@@ -22,7 +22,6 @@ def _build_summarizer():
 
 
 def _build_clients():
-    from app.google.calendar_client import GoogleCalendarClient  # noqa: F401 (parity import)
     from app.google.meet_client import GoogleMeetClient
     from app.google.oauth_client import GoogleOAuthClient
 

@@ -26,8 +26,8 @@ class NotesResponse(BaseModel):
     conference_id: uuid.UUID
     title: str
     summary: str
-    decisions: list
-    action_items: list
+    decisions: list[str]
+    action_items: list[ActionItem]
     doc_url: str | None = None
     created_at: datetime
 
@@ -36,7 +36,7 @@ class TranscriptResponse(BaseModel):
     conference_id: uuid.UUID
     language: str | None
     text: str
-    speaker_map: dict
+    speaker_map: dict[str, str]
 
 
 class ConferenceResponse(BaseModel):

@@ -44,7 +44,9 @@ class GeminiSummarizer:
         resp = await self._client.aio.models.count_tokens(
             model=self._model, contents=text
         )
-        return resp.total_tokens
+        # total_tokens is Optional in the SDK; treat a missing count as 0 so the
+        # caller's threshold comparison never hits None.
+        return resp.total_tokens or 0
 
     async def summarize(self, transcript: str) -> NotesContent:
         resp = await self._client.aio.models.generate_content(
