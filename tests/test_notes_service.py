@@ -117,6 +117,27 @@ async def test_generate_notes_map_reduce_when_over_threshold(db_session):
     assert notes.summary.startswith("summary of")
 
 
+async def test_map_reduce_feeds_combined_partials_to_reduce(db_session):
+    conf = await _conf_with_transcript(db_session, text="x" * 5000)
+    summarizer = FakeSummarizer(tokens=5000)
+    await notes_service.generate_notes(
+        db_session, conference=conf, summarizer=summarizer, model="m",
+        chunk_threshold=1000, default_title="Meeting Notes",
+    )
+    # last call is the reduce pass; it must summarize the combined section text,
+    # not the raw transcript.
+    assert "Section 1 summary:" in summarizer.summarize_calls[-1]
+
+
+def test_chunk_splits_oversized_single_line():
+    from app.services.notes_service import _chunk
+    text = "y" * 10000  # single line, no newlines
+    chunks = _chunk(text, 3000)
+    assert len(chunks) > 1
+    assert all(len(c) <= 3000 for c in chunks)
+    assert "".join(chunks) == text  # no content lost
+
+
 async def test_generate_notes_is_idempotent_upsert(db_session):
     conf = await _conf_with_transcript(db_session)
     await notes_service.generate_notes(
