@@ -66,6 +66,13 @@ async def test_summarize_raises_on_empty_and_blocked():
         await summarizer.summarize("transcript")
 
 
+async def test_summarize_raises_on_empty_completion_no_feedback():
+    models = _FakeModels(resp=_Resp(parsed=None, text="", candidates=[], prompt_feedback=None))
+    summarizer = GeminiSummarizer(client=_FakeClient(models), model="m")
+    with pytest.raises(SummarizationError, match="empty completion"):
+        await summarizer.summarize("transcript")
+
+
 async def test_count_tokens_proxies_client():
     models = _FakeModels(resp=_Resp(parsed=NotesContent(summary="x")))
     summarizer = GeminiSummarizer(client=_FakeClient(models), model="m")

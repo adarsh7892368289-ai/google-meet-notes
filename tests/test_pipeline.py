@@ -140,6 +140,20 @@ async def test_run_pipeline_records_failure_and_reraises(db_session):
     assert "meet api down" in (conf.last_error or "")
 
 
+async def test_run_pipeline_no_transcript_resource_fails(db_session):
+    conf = await _conf(db_session, with_transcript_resource=False)
+    with pytest.raises(Exception):
+        await pipeline.run_pipeline(
+            db_session, conference_id=conf.id, oauth_client=FakeOAuthClient(),
+            meet_client=FakeMeetClient(), summarizer=FakeSummarizer(), model="m",
+            chunk_threshold=600000, default_title="Meeting Notes",
+        )
+    await db_session.refresh(conf)
+    assert conf.pipeline_state == "failed"
+    assert conf.attempts == 1
+    assert conf.last_error
+
+
 async def test_run_pipeline_missing_conference_is_noop(db_session):
     import uuid
     # should not raise
@@ -187,3 +201,5 @@ async def test_run_pipeline_stage2_fails_then_retry_resumes(db_session):
     assert conf.pipeline_state == "notes_generated"
     assert meet.entry_calls == 2  # stage 1 re-ran (wasteful but safe)
     assert await db_session.scalar(select(Notes).where(Notes.conference_id == conf.id)) is not None
+    assert conf.last_error is None  # last_error cleared on success
+    assert conf.attempts == 1  # attempts not re-incremented on success
